@@ -14,18 +14,20 @@ if(!isset($_SESSION['user_id']))
         //TODAY
 
         $todayQ=mysqli_query($conn, "SELECT 
-        SUM(total) AS sales,
-        SUM(profit) AS profit
-        FROM sales WHERE DATE(sold_at) = '$today'");
+        SUM(s.total_amount) AS sales,
+        SUM(si.profit) AS profit
+        FROM sales s
+        LEFT JOIN sale_items si ON si.sale_id=s.id
+         WHERE DATE(s.sold_at) = '$today'");
 
         $todayData=mysqli_fetch_assoc($todayQ);
 
         //THIS MONTH
 
         $monthQ=mysqli_query($conn, "SELECT 
-        SUM(total) AS sales,
-        SUM(Profit) AS profit
-        FROM sales WHERE DATE_FORMAT(sold_at, '%Y-%m')='$month'");
+        SUM(s.total_amount) AS sales,
+        SUM(si.Profit) AS profit
+        FROM sales s LEFT JOIN sale_items si ON si.sale_id=s.id  WHERE DATE_FORMAT(sold_at, '%Y-%m')='$month'");
 
 
 $monthData=mysqli_fetch_assoc($monthQ);

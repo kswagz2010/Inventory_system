@@ -7,50 +7,81 @@
         exit;
     }
 
-        $where="1"; //default=no filter
+        $where="1=1"; //default=no filter
 
-        if(!empty($_GET['date'])){
+        if(isset($_GET['date']) && !empty($_GET['date'])){
             $date=$_GET['date'];
-            $where="DATE(sales.sold_at)='$date'";
+            $where.=" AND DATE(sales.sold_at)='$date'";
         }
 
-        elseif(!empty($_GET['month'])){
-            $month=$_GET['month'];
-            $where="DATE_FORMAT(sales.sold_at, '%Y-%m')='$month'";
+        if(isset($_GET['month']) && !empty($_GET['month'])){
+            $month=$_GET['date'];
+            $where.=" AND DATE_FORMAT(sales.sold_at, '%Y-%m')='$month'";
         }
 
 
 
-
-    $query="SELECT sales.id, 
-    products.product_name AS product_name,
-     sales.quantity, 
-     sales.total,
-     sales.profit,
+    $query="SELECT 
+    products.product_name,
+     sale_items.quantity, 
+    sale_items.subtotal,
+     sale_items.profit,
      sales.sold_at,
-     users.full_name AS sold_by
-     FROM sales
-     JOIN products ON sales.product_id=products.id
+     users.full_name
+     FROM sale_items
+     JOIN sales ON sale_items.sale_id=sales.id
+     JOIN products ON sale_items.product_id=products.id
      JOIN users ON sales.sold_by=users.id
-     WHERE $where
-     ORDER BY sales.sold_at DESC ";
+";
+
+
+      $where="";
+
+      if(!empty($_GET['from']) && !empty($_GET['to'])){
+        $from=$_GET['from'];
+        $to=$_GET['to'];
+      
+
+      $where="WHERE DATE(sales.sold_at)
+      BETWEEN '$from 00:00:00' AND '$to 23:59:59'";
+      }
+
+      $query.=$where;
+      $query.="ORDER BY sales.sold_at DESC";
 
         $result=mysqli_query($conn,$query);
 
 
 
+
+
+
+
+
+
+
+        $grandTotal=0;
+        $grandProfit=0;
+        while($row=mysqli_fetch_assoc($result)){
+            $grandTotal+=$row['subtotal'];
+            $grandProfit+=$row['profit'];
+            $rows[] = $row;
+        }
 ?>
 
+<h2>Sales Report</h2>
 
 <form action="" method="GET" style="margin-botton:15px;">
     <label for="">
-        Select Date:
-        <input type="date" name="date" onchange="this.form.month.value=''">
+        From:
+
+        <input type="date" name="from" value= "<?=isset($_GET['from']) ? $_GET['from']:''?>"> 
+
     </label>
 
     <label for="">
-        Select Month:
-        <input type="month" name="month" onchange="this.form.date.value=''">
+        To:
+         <input type="date" name="to" value="<?=isset($_GET['to'])? $_GET['to']:''?>">
     </label>
 
         <button type="submit">filter</button>
@@ -62,64 +93,41 @@
 
 <table border="1" cellpadding="10">
     <tr>
-        <th>
-            Product
-        </th>
-        <th>Qyy</th>
+        <thead>
+        
+        <th>Product</th>
+        <th>Quantity</th>
         <th>Total</th>
         <th>Profit</th>
         <th>Sold By</th>
         <th>Date</th>
     </tr>
-
-    <?php while($row=mysqli_fetch_assoc($result)):?>
+</thead>
+<tbody>
+    <?php if(!empty($rows)):?>
+        <?php foreach($rows as $row): ?>
+    
         <tr>
-            <td><?=$row['product_name']?></td>
+            
+            <td><?=htmlspecialchars($row['product_name'])?></td>
             <td><?=$row['quantity']?></td>
-            <td>₦<?=number_format($row['total'],2)?></td>
+            <td>₦<?=number_format($row['subtotal'],2)?></td>
             <td>₦<?=number_format($row['profit'],2)?></td>
-            <td><?=$row['sold_by']?></td>
+            <td><?=htmlspecialchars($row['full_name'])?></td>
             <td><?=$row['sold_at']?></td>
         </tr>
-<?php endwhile;?>
+<?php endforeach;?>
+<tr>
+    <td colspan="2"><strong>Grand Total</strong></td>
+    <td><strong><?="₦".number_format($grandTotal, 2)?></strong></td>
+        <td><strong><?="₦".number_format($grandProfit, 2)?></strong></td>
+        <td colspan="2"></td>
+        </tr>
+        <?php else: ?>
+            <tr>
+                <td colspan="6">No Sales Found for this period.</td>
+           </tr>
+           <?php endif; ?>
+        </tbody>
 </table>
 
-<?php
-$today=date('Y-m-d');
-$daily=mysqli_query($conn, "SELECT SUM(total) AS total_sales
-FROM sales WHERE DATE(sold_at)='$today'");
-
-$dailyTotal=mysqli_fetch_assoc($daily)['total_sales']??0;
-
-
-
-?>
-<?php
-//display ?>
-<h3>Today's Sales: ₦<?=number_format($dailyTotal, 2)?></h3>
-
-<?php 
-    $month=date('Y-m');
-
-    $monthly=mysqli_query($conn, 
-    "SELECT SUM(total) AS total_sales FROM sales WHERE DATE_FORMAT(sold_at, '%Y-%m')='$month'");
-
-    $monthlyTotal=mysqli_fetch_assoc($monthly)
-    ['total_sales']??0;
-?>
-
-
-<?php //display
- ?>
-    <h3> This Month: ₦<?=number_format($monthlyTotal, 2)?></h3>
-
-<?php $totalQuery=mysqli_query($conn, "SELECT SUM(total) AS total_sales FROM sales WHERE $where");
-
-$totalSales=mysqli_fetch_assoc($totalQuery)
-['total_sales']??0;
-$profitQuery = mysqli_query($conn, "SELECT SUM(profit) AS total_profit FROM sales WHERE $where");
-$totalProfit=mysqli_fetch_assoc($profitQuery)['total_profit']??0;
-?>
-    <h3>This day sales is: ₦<?=number_format($totalSales,2);?></h3>    
-<?php var_dump($totalSales); ?>
-<h3>Total Profit: ₦<?=number_format($totalProfit, 2)?> </h3>
